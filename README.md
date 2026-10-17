@@ -13,12 +13,13 @@ Python 3.9+. No packages to install, only the standard library is used.
 | File | What it is |
 |---|---|
 | `runners.txt` | parkrun IDs of everyone in the challenge, one per line |
-| `baselines.csv` | The agreed handicap for each runner (`parkrun_id,name,baseline_seconds,baseline`) |
+| `baselines.csv` | The agreed Round 1 handicap for each runner (`parkrun_id,name,baseline_seconds,baseline`) |
 | `group_members.py` | Lists the members of a parkrun group (club) page |
 | `baseline-avg.py` | Handicap suggestion: average of the last 3 parkruns |
 | `baseline_fastest.py` | Handicap suggestion: fastest parkrun of a given year |
 | `event_results.py` | Fetches the results of the runners at one parkrun event |
 | `round_points.py` | Scores a round according to the rules |
+| `adjust_handicaps.py` | Tightens handicaps after a round for runners who beat the field |
 | `standings.py` | Season standings from the round scores (best 4 rounds) |
 
 ## The rules
@@ -35,6 +36,16 @@ place.
   didn't get a speed bonus.
 - Your best 4 rounds count. Minimum 3 rounds to win. Ties are split by the
   better result in the most recent round.
+
+**Handicap adjustments,** after each round except Bunya:
+
+1. Work out how far each runner beat their handicap, as a percentage.
+2. Find the median of those percentages across everyone who ran. This takes
+   out the course and the conditions.
+3. Anyone above the median has their handicap tightened by half the gap
+   between their result and the median.
+4. Nobody gets loosened.
+5. Changes apply from the next round. Points already won stand.
 
 ## Runner input
 
@@ -93,7 +104,7 @@ The event name is the one in the parkrun URL, e.g. `kedron` for
 **For the spreadsheet:**
 
 ```sh
-./event_results.py --sheet kedron 2026-10-03 < baselines.csv > round1.csv
+./event_results.py --sheet kedron 2026-10-03 < baselines.csv > round1-sheet.csv
 ```
 
 ```
@@ -125,14 +136,36 @@ parkrun_id,name,position,time,time_seconds,age_grade,age_group,gender,achievemen
 ```
 
 Needs the plain `event_results.py` output, not the `--sheet` one. Prints
-each finisher's place, how far they were from their handicap and the points
-broken down (place, speed, PB, age grade, total).
+each finisher's place, how far they were from their handicap (as a
+percentage) and the points broken down (place, speed, PB, age grade, total).
 
-The script compares times to handicaps as a **percentage**, while the
-spreadsheet's Delta column uses **seconds**. The two can rank runners
-differently, so pick one and stick to it.
+Use the handicaps for that round: `baselines.csv` for Round 1,
+`handicaps-round2.csv` for Round 2, and so on (see the next step).
 
-### 5. Update the standings
+### 5. Adjust the handicaps for the next round
+
+```sh
+./adjust_handicaps.py baselines.csv round1-results.csv > handicaps-round2.csv
+./adjust_handicaps.py handicaps-round2.csv round2-results.csv > handicaps-round3.csv
+```
+
+Writes the next round's handicaps in the same format and order as the input,
+and prints the changes:
+
+```
+median: beat handicap by +0.94% (12 finishers)
+  Jason HARTWICH: beat by 3.96%, -1.51%, 18:55 -> 18:38
+  Robert MCNAB: beat by 4.04%, -1.55%, 18:35 -> 18:18
+  ...
+```
+
+New handicaps are rounded to the nearest second. **Skip this after Bunya:**
+copy the handicaps file unchanged for the next round instead.
+
+Keep one handicaps file per round, so any round can be re-scored later with
+the handicaps it was run on.
+
+### 6. Update the standings
 
 ```sh
 ./standings.py round1-points.csv round2-points.csv round3-points.csv > standings.csv
@@ -154,14 +187,15 @@ place,parkrun_id,name,round1,round2,round3,rounds_run,best_4,qualified
   qualified runners can win, so they're listed first, followed by everyone
   else. Early in the season nobody is qualified yet, so the table is just
   ordered by points.
-- **Ties** in best_4 (within each group) are split by points in the most recent round, then the
-  round before, and so on. A missed round counts as 0. Runners still tied
+- **Ties** in best_4 (within each group) are split by points in the most
+  recent round, then the round before, and so on. A missed round counts as 0. Runners still tied
   after that share the place.
 
 ## Spreadsheet formulas
 
-Each round's tab has the runners in rows 2–40. Columns A–D are pasted from
-`event_results.py --sheet`, and E–K are formulas (row 2 shown, fill down):
+Each round's tab has the runners in rows 2–41, in the same order as the
+handicaps files. Columns A–D are pasted from `event_results.py --sheet`, and
+E–M are formulas (row 2 shown, fill down):
 
 | Col | Header | Formula |
 |---|---|---|
@@ -169,15 +203,22 @@ Each round's tab has the runners in rows 2–40. Columns A–D are pasted from
 | B | Age grade | *(pasted)* |
 | C | Parkrun time | *(pasted)* |
 | D | PB? | *(pasted)* |
-| E | Delta | `=IF(C2="", "", C2-handicaps!C2)` |
-| F | Rank | `=IF(E2="", "", RANK(E2, E$2:E$40, 1))` |
+| E | Delta | `=IF(C2="", "", C2/L2-1)` |
+| F | Rank | `=IF(E2="", "", RANK(E2, E$2:E$41, 1))` |
 | G | Score | `=IF(F2="", 0, SWITCH(F2, 1, 10, 2, 8, 3, 6, 4, 5, 5, 4, 6, 3, 7, 2, 1))` |
-| H | Bonus - Top 3? | `=IF(C2="", 0, IFERROR(CHOOSE(RANK(C2, C$2:C$40, 1), 3, 2, 1), 0))` |
+| H | Bonus - Top 3? | `=IF(C2="", 0, IFERROR(CHOOSE(RANK(C2, C$2:C$41, 1), 3, 2, 1), 0))` |
 | I | Bonus - PB? | `=IF(D2="Yes", 1, 0)` |
-| J | Bonus - Age grade | `=IF(OR(B2="", H2>0), 0, IF(B2=MAXIFS(B$2:B$40, H$2:H$40, 0), 2, 0))` |
+| J | Bonus - Age grade | `=IF(OR(B2="", H2>0), 0, IF(B2=MAXIFS(B$2:B$41, H$2:H$41, 0), 2, 0))` |
 | K | Total Score | `=G2+H2+I2+J2` |
+| L | Handicap | Round 1: `=handicaps!C2`. Later rounds: the previous round's Next handicap, e.g. `='Round 1'!M2` |
+| M | Next handicap | `=IF(OR(E2="", E2>=MEDIAN(E$2:E$41)), L2, ROUND(L2*(1-(MEDIAN(E$2:E$41)-E2)/2)*86400)/86400)` |
 
-For Delta as a percentage instead, use `=IF(C2="", "", C2/handicaps!C2-1)`.
+- **Delta** is the percentage vs handicap: negative means faster than the
+  handicap. Format column E as Percent.
+- **Next handicap** tightens anyone faster than the median Delta by half the
+  gap and leaves everyone else unchanged. `*86400` rounds it to the nearest
+  second, matching `adjust_handicaps.py`. Format column M as Duration.
+- **Bunya:** set Next handicap to `=L2`, so nobody's handicap changes.
 
 ## Notes
 
