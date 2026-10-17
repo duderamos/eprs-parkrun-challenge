@@ -29,12 +29,12 @@ def round_label(path):
     return name.removesuffix("-points").removesuffix("_points")
 
 
-def main():
-    paths = sys.argv[1:]
-    if not paths or any(p in ("-h", "--help") for p in paths):
-        sys.exit(__doc__)
+def standings(paths):
+    """Rank runners from the round points files, oldest first.
 
-    labels = [round_label(p) for p in paths]
+    Returns one dict per runner, in standings order, with "points" holding
+    each round's total (None for a missed round).
+    """
     names = {}
     points = {}  # parkrun_id -> {round index: total}
     for i, path in enumerate(paths):
@@ -58,19 +58,37 @@ def main():
 
     ranked = sorted(points, key=sort_key)
 
-    out = csv.writer(sys.stdout)
-    out.writerow(["place", "parkrun_id", "name", *labels, "rounds_run",
-                  f"best_{ROUNDS_COUNTED}", "qualified"])
+    rows = []
     place = 0
     for n, rid in enumerate(ranked):
         if not n or sort_key(rid) != sort_key(ranked[n - 1]):
             place = n + 1
-        rounds = points[rid]
+        rows.append({
+            "place": place,
+            "parkrun_id": rid,
+            "name": names[rid],
+            "points": [points[rid].get(i) for i in range(len(paths))],
+            "rounds_run": len(points[rid]),
+            "best": best(rid),
+            "qualified": qualified(rid),
+        })
+    return rows
+
+
+def main():
+    paths = sys.argv[1:]
+    if not paths or any(p in ("-h", "--help") for p in paths):
+        sys.exit(__doc__)
+
+    out = csv.writer(sys.stdout)
+    out.writerow(["place", "parkrun_id", "name", *map(round_label, paths),
+                  "rounds_run", f"best_{ROUNDS_COUNTED}", "qualified"])
+    for r in standings(paths):
         out.writerow([
-            place, rid, names[rid],
-            *[rounds.get(i, "") for i in range(len(paths))],
-            len(rounds), best(rid),
-            "yes" if qualified(rid) else "no",
+            r["place"], r["parkrun_id"], r["name"],
+            *["" if p is None else p for p in r["points"]],
+            r["rounds_run"], r["best"],
+            "yes" if r["qualified"] else "no",
         ])
 
 

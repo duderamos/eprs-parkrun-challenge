@@ -21,6 +21,8 @@ Python 3.9+. No packages to install, only the standard library is used.
 | `round_points.py` | Scores a round according to the rules |
 | `adjust_handicaps.py` | Tightens handicaps after a round for runners who beat the field |
 | `standings.py` | Season standings from the round scores (best 4 rounds) |
+| `build_site.py` | Builds the web page from `data/` |
+| `data/` | Each round's handicaps, results and points |
 
 ## The rules
 
@@ -135,6 +137,13 @@ parkrun_id,name,position,time,time_seconds,age_grade,age_group,gender,achievemen
 ./round_points.py baselines.csv round1-results.csv > round1-points.csv
 ```
 
+**Round 1 (Kedron) only:** it was consolidated before the percentage rule,
+ranking by seconds under the handicap, so score it with `--rank-by seconds`:
+
+```sh
+./round_points.py --rank-by seconds handicaps-round1.csv round1-results.csv > round1-points.csv
+```
+
 Needs the plain `event_results.py` output, not the `--sheet` one. Prints
 each finisher's place, how far they were from their handicap (as a
 percentage) and the points broken down (place, speed, PB, age grade, total).
@@ -191,9 +200,28 @@ place,parkrun_id,name,round1,round2,round3,rounds_run,best_4,qualified
   recent round, then the round before, and so on. A missed round counts as 0. Runners still tied
   after that share the place.
 
+### 7. Publish the page
+
+The standings and round results are published at
+<https://duderamos.github.io/eprs-parkrun-challenge/>, built from `data/`:
+
+```
+data/rounds.csv               round,event,date (add a line per round)
+data/handicaps-roundN.csv     handicaps used for round N
+data/roundN-results.csv       event_results.py output
+data/roundN-points.csv        round_points.py output
+```
+
+Add the new round's files and push to `main`; a GitHub Action runs
+`build_site.py` and deploys it. To preview locally first:
+
+```sh
+./build_site.py && open site/index.html
+```
+
 ## Spreadsheet formulas
 
-Each round's tab has the runners in rows 2–41, in the same order as the
+Each round's tab has the runners in rows 2–43, in the same order as the
 handicaps files. Columns A–D are pasted from `event_results.py --sheet`, and
 E–M are formulas (row 2 shown, fill down):
 
@@ -204,14 +232,14 @@ E–M are formulas (row 2 shown, fill down):
 | C | Parkrun time | *(pasted)* |
 | D | PB? | *(pasted)* |
 | E | Delta | `=IF(C2="", "", C2/L2-1)` |
-| F | Rank | `=IF(E2="", "", RANK(E2, E$2:E$41, 1))` |
+| F | Rank | `=IF(E2="", "", RANK(E2, E$2:E$43, 1))` |
 | G | Score | `=IF(F2="", 0, SWITCH(F2, 1, 10, 2, 8, 3, 6, 4, 5, 5, 4, 6, 3, 7, 2, 1))` |
-| H | Bonus - Top 3? | `=IF(C2="", 0, IFERROR(CHOOSE(RANK(C2, C$2:C$41, 1), 3, 2, 1), 0))` |
+| H | Bonus - Top 3? | `=IF(C2="", 0, IFERROR(CHOOSE(RANK(C2, C$2:C$43, 1), 3, 2, 1), 0))` |
 | I | Bonus - PB? | `=IF(D2="Yes", 1, 0)` |
-| J | Bonus - Age grade | `=IF(OR(B2="", H2>0), 0, IF(B2=MAXIFS(B$2:B$41, H$2:H$41, 0), 2, 0))` |
+| J | Bonus - Age grade | `=IF(OR(B2="", H2>0), 0, IF(B2=MAXIFS(B$2:B$43, H$2:H$43, 0), 2, 0))` |
 | K | Total Score | `=G2+H2+I2+J2` |
 | L | Handicap | Round 1: `=handicaps!C2`. Later rounds: the previous round's Next handicap, e.g. `='Round 1'!M2` |
-| M | Next handicap | `=IF(OR(E2="", E2>=MEDIAN(E$2:E$41)), L2, ROUND(L2*(1-(MEDIAN(E$2:E$41)-E2)/2)*86400)/86400)` |
+| M | Next handicap | `=IF(OR(E2="", E2>=MEDIAN(E$2:E$43)), L2, ROUND(L2*(1-(MEDIAN(E$2:E$43)-E2)/2)*86400)/86400)` |
 
 - **Delta** is the percentage vs handicap: negative means faster than the
   handicap. Format column E as Percent.

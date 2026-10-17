@@ -3,6 +3,7 @@
 
 Usage:
     ./round_points.py baselines.csv round2.csv > round2_points.csv
+    ./round_points.py --rank-by seconds baselines.csv round1.csv   # Kedron only
 
   baselines.csv   parkrun_id + baseline_seconds per runner (the agreed handicaps)
   roundN.csv      output of event_results.py for the round
@@ -10,6 +11,8 @@ Usage:
 Rules:
   * Handicap: each finisher's time is compared to their baseline as a
     percentage, (time - baseline) / baseline. Lowest wins.
+    Round 1 (Kedron) was consolidated before this rule, ranking by seconds
+    under the baseline instead: --rank-by seconds reproduces it.
   * Place points: 10, 8, 6, 5, 4, 3, 2, then 1 for every other finisher.
   * Speed bonus: first 3 runners across the line get +3, +2, +1.
   * PB bonus: +1 for a course PB ("New PB!"). A first run at that course
@@ -47,10 +50,14 @@ def load_finishers(path):
     return [r for r in read_csv(path) if r.get("time_seconds")]
 
 
-def handicap(row, baselines):
-    """Fractional difference vs baseline; negative means faster than usual."""
+def handicap(row, baselines, rank_by="percent"):
+    """Difference vs baseline; negative means faster than usual.
+
+    A fraction of the baseline, or plain seconds with rank_by="seconds".
+    """
     base = baselines[row["parkrun_id"]]
-    return (int(row["time_seconds"]) - base) / base
+    diff = int(row["time_seconds"]) - base
+    return diff if rank_by == "seconds" else diff / base
 
 
 def age_grade(row):
@@ -61,7 +68,11 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("baselines")
     ap.add_argument("results")
+    ap.add_argument("--rank-by", choices=["percent", "seconds"], default="percent",
+                    help="how to compare times to the baseline (default: percent; "
+                         "seconds only for Kedron, scored under the old rule)")
     args = ap.parse_args()
+    vs = lambda r: handicap(r, baselines, args.rank_by)
 
     baselines = load_baselines(args.baselines)
     finishers = load_finishers(args.results)
@@ -74,12 +85,12 @@ def main():
             continue
         ranked.append(r)
 
-    ranked.sort(key=lambda r: handicap(r, baselines))
+    ranked.sort(key=vs)
 
     # Standard competition ranking: a tie shares the higher place.
     places = {}
     for i, r in enumerate(ranked):
-        if i and handicap(r, baselines) == handicap(ranked[i - 1], baselines):
+        if i and vs(r) == vs(ranked[i - 1]):
             places[r["parkrun_id"]] = places[ranked[i - 1]["parkrun_id"]]
         else:
             places[r["parkrun_id"]] = i + 1
@@ -109,7 +120,8 @@ def main():
             place_pts = PLACE_POINTS[place - 1] if place <= len(PLACE_POINTS) else OTHER_FINISHER_POINTS
             base = round(baselines[rid])
             base_str = f"{base // 60}:{base % 60:02d}"
-            vs_str = f"{handicap(r, baselines) * 100:+.2f}%"
+            vs_str = (f"{vs(r):+.0f}s" if args.rank_by == "seconds"
+                      else f"{vs(r) * 100:+.2f}%")
         speed_pts = speed.get(rid, 0)
         pb_pts = PB_BONUS if r["achievement"] == "New PB!" else 0
         age_pts = AGE_GRADE_BONUS if rid in age_bonus else 0
