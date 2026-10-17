@@ -209,8 +209,9 @@ def build():
             handicaps[n] = read_csv(path)
 
     latest = rounds[-1]
+    title = f"EPRS Parkrun Challenge {rounds[0]['date'][:4]}"
     parts = [f"""<header>
-<h1>EPRS parkrun Handicap Challenge</h1>
+<h1>{title}</h1>
 <p>{len(rounds)} round{"s" if len(rounds) != 1 else ""} run · latest:
 {esc(latest["event"].title())}, {fmt_date(latest["date"])}</p>
 </header>
@@ -249,7 +250,7 @@ def build():
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>EPRS Handicap Challenge</title>
+<title>{title}</title>
 <style>{STYLE}</style>
 </head>
 <body><main>
