@@ -14,9 +14,10 @@ Rules:
     Round 1 (Kedron) was consolidated before this rule, ranking by seconds
     under the baseline instead: --rank-by seconds reproduces it.
   * Place points: 10, 8, 6, 5, 4, 3, 2, then 1 for every other finisher.
-  * Speed bonus: first 3 runners across the line get +3, +2, +1.
-  * PB bonus: +1 for a course PB ("New PB!"). A first run at that course
-    ("First Timer!") doesn't count.
+  * Speed bonus: the 3 fastest times get +3, +2, +1. Equal times share the
+    place (parkrun's finish positions split them arbitrarily).
+  * PB bonus: +1 for a course PB ("New PB!") or a lifetime PB (lifetime_pb,
+    set by event_results.py for first timers at the course).
   * Age-grade bonus: +2 for the highest age grade among finishers without a
     speed bonus (shared if tied).
   * Tied runners share the higher place's points.
@@ -60,6 +61,10 @@ def handicap(row, baselines, rank_by="percent"):
     return diff if rank_by == "seconds" else diff / base
 
 
+def is_pb(row):
+    return row["achievement"] == "New PB!" or row.get("lifetime_pb") == "yes"
+
+
 def age_grade(row):
     return float(row["age_grade"].rstrip("%") or 0)
 
@@ -97,14 +102,16 @@ def main():
 
     speed = {}
     # Bonuses consider every finisher, including anyone without a baseline.
-    for r, bonus in zip(sorted(finishers, key=lambda r: int(r["position"])), SPEED_BONUS):
-        speed[r["parkrun_id"]] = bonus
+    for r in finishers:
+        faster = sum(int(o["time_seconds"]) < int(r["time_seconds"]) for o in finishers)
+        if faster < len(SPEED_BONUS):
+            speed[r["parkrun_id"]] = SPEED_BONUS[faster]
 
     eligible = [r for r in finishers if r["parkrun_id"] not in speed and r["age_grade"]]
     top_grade = max((age_grade(r) for r in eligible), default=None)
     age_bonus = {r["parkrun_id"] for r in eligible if age_grade(r) == top_grade}
 
-    out = csv.writer(sys.stdout)
+    out = csv.writer(sys.stdout, lineterminator="\n")
     out.writerow([
         "place", "parkrun_id", "name", "position", "time", "baseline",
         "vs_baseline", "place_points", "speed_bonus", "pb_bonus", "age_grade",
@@ -123,7 +130,7 @@ def main():
             vs_str = (f"{vs(r):+.0f}s" if args.rank_by == "seconds"
                       else f"{vs(r) * 100:+.2f}%")
         speed_pts = speed.get(rid, 0)
-        pb_pts = PB_BONUS if r["achievement"] == "New PB!" else 0
+        pb_pts = PB_BONUS if is_pb(r) else 0
         age_pts = AGE_GRADE_BONUS if rid in age_bonus else 0
         out.writerow([
             place or "", rid, r["name"], r["position"], r["time"], base_str,

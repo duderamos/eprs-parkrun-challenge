@@ -80,7 +80,7 @@ def main():
     if not paths or any(p in ("-h", "--help") for p in paths):
         sys.exit(__doc__)
 
-    out = csv.writer(sys.stdout)
+    out = csv.writer(sys.stdout, lineterminator="\n")
     out.writerow(["place", "parkrun_id", "name", *map(round_label, paths),
                   "rounds_run", f"best_{ROUNDS_COUNTED}", "qualified"])
     for r in standings(paths):

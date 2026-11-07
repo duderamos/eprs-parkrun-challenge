@@ -151,7 +151,7 @@ def main():
             else:
                 print(f"skipping unrecognised line: {line!r}", file=sys.stderr)
 
-    out = csv.writer(sys.stdout)
+    out = csv.writer(sys.stdout, lineterminator="\n")
     out.writerow([
         "parkrun_id", "name", "fastest_date", "fastest_event", "fastest_time",
         "runs_in_year", "baseline_seconds", "baseline",

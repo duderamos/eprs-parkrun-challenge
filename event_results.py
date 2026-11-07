@@ -11,9 +11,13 @@ profile URL or an "id,name" CSV line. Blank lines and lines starting with #
 are ignored. Output rows keep the input order; runners who didn't run at
 that event get an empty row.
 
+First timers at the course are looked up in their full parkrun history:
+lifetime_pb is "yes" when the run beats every parkrun they ran before. A
+first ever parkrun has nothing to beat, so it doesn't count.
+
 --sheet prints the layout of the round tab in the spreadsheet instead:
 Name, Age grade, Parkrun time (as HH:MM:SS so Sheets reads it as a
-duration), PB? ("Yes" for a course PB; a first timer doesn't count).
+duration), PB? ("Yes" for a course PB or a lifetime PB).
 Names for runners who didn't run are taken from the second column of the
 input when it is a CSV (e.g. baselines.csv).
 """
@@ -22,9 +26,12 @@ import argparse
 import csv
 import re
 import sys
+import time
 import urllib.request
-from datetime import date
+from datetime import date, datetime
 from html.parser import HTMLParser
+
+from baseline_fastest import AllResultsParser, fetch as fetch_history
 
 RESULTS_URL = "https://www.parkrun.com.au/{event}/results/{date}/"
 USER_AGENT = (
@@ -95,6 +102,20 @@ def fetch(url):
         return resp.read().decode("utf-8", errors="replace")
 
 
+def lifetime_pb(rid, run_date, secs):
+    """True when secs beats every parkrun the runner ran before run_date."""
+    p = AllResultsParser()
+    p.feed(fetch_history(rid))
+    # Columns: Event, Run Date, Run Number, Pos, Time, Age Grade, PB?
+    before = [to_seconds(row[4]) for row in p.rows
+              if len(row) >= 5 and datetime.strptime(row[1], "%d/%m/%Y").date() < run_date]
+    return bool(before) and secs < min(before)
+
+
+def is_pb(r):
+    return r.get("data-achievement") == "New PB!" or r.get("lifetime_pb")
+
+
 def sheet_time(t):
     secs = to_seconds(t)
     return f"{secs // 3600:02d}:{secs % 3600 // 60:02d}:{secs % 60:02d}"
@@ -111,7 +132,7 @@ def write_sheet(out, ids, input_names, results):
         out.writerow([
             r.get("data-name", ""), r.get("data-agegrade", ""),
             sheet_time(time_str) if time_str else "",
-            "Yes" if r.get("data-achievement") == "New PB!" else "",
+            "Yes" if is_pb(r) else "",
         ])
 
 
@@ -142,7 +163,20 @@ def main():
     if not p.results:
         sys.exit(f"no results found at {url}")
 
-    out = csv.writer(sys.stdout)
+    for rid in ids:
+        r = p.results.get(rid)
+        if not r or r.get("data-achievement") != "First Timer!" or not r.get("time"):
+            continue
+        time.sleep(1)  # be gentle with parkrun
+        try:
+            r["lifetime_pb"] = lifetime_pb(rid, args.date, to_seconds(r["time"]))
+        except Exception as e:
+            print(f"{rid}: couldn't check lifetime PB ({e})", file=sys.stderr)
+            continue
+        if r["lifetime_pb"]:
+            print(f"{r.get('data-name', rid)}: first timer, lifetime PB", file=sys.stderr)
+
+    out = csv.writer(sys.stdout, lineterminator="\n")
     if args.sheet:
         write_sheet(out, ids, input_names, p.results)
         found = sum(rid in p.results for rid in ids)
@@ -151,13 +185,13 @@ def main():
 
     out.writerow([
         "parkrun_id", "name", "position", "time", "time_seconds",
-        "age_grade", "age_group", "gender", "achievement",
+        "age_grade", "age_group", "gender", "achievement", "lifetime_pb",
     ])
     found = 0
     for rid in ids:
         r = p.results.get(rid)
         if r is None:
-            out.writerow([rid, "", "", "", "", "", "", "", ""])
+            out.writerow([rid, "", "", "", "", "", "", "", "", ""])
             continue
         found += 1
         time_str = r.get("time", "")
@@ -166,6 +200,7 @@ def main():
             to_seconds(time_str) if time_str else "",
             r.get("data-agegrade", ""), r.get("data-agegroup", ""),
             r.get("data-gender", ""), r.get("data-achievement", ""),
+            "yes" if r.get("lifetime_pb") else "",
         ])
     print(f"{found}/{len(ids)} runners found at {url}", file=sys.stderr)
 

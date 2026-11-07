@@ -59,7 +59,7 @@ def main():
     print(f"median: beat handicap by {median * 100:+.2f}% ({len(beat)} finishers)",
           file=sys.stderr)
 
-    out = csv.writer(sys.stdout)
+    out = csv.writer(sys.stdout, lineterminator="\n")
     out.writerow(["parkrun_id", "name", "baseline_seconds", "baseline"])
     for h in handicaps:
         rid = h["parkrun_id"]

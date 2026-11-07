@@ -151,7 +151,7 @@ def main():
         header += [f"run{i}_date", f"run{i}_event", f"run{i}_time"]
     header += ["runs_counted", "baseline_seconds", "baseline"]
 
-    out = csv.writer(sys.stdout)
+    out = csv.writer(sys.stdout, lineterminator="\n")
     out.writerow(header)
 
     for n, rid in enumerate(ids):

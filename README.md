@@ -32,8 +32,10 @@ place.
 
 - **Points:** 1st = 10, 2nd = 8, 3rd = 6, 4th = 5, 5th = 4, 6th = 3,
   7th = 2, everyone else who finishes = 1.
-- **Speed bonus:** the first 3 EPRS runners across the line get +3, +2, +1.
-- **PB bonus:** +1 for a course PB. A first run at that course doesn't count.
+- **Speed bonus:** the 3 fastest EPRS times get +3, +2, +1. Equal times
+  share the place (parkrun's finish positions split them arbitrarily).
+- **PB bonus:** +1 for a course PB. A first run at that course counts only
+  if it's a lifetime PB.
 - **Age-grade bonus:** +2 for the highest age grade among EPRS runners who
   didn't get a speed bonus.
 - Your best 4 rounds count. Minimum 3 rounds to win. Ties are split by the
@@ -127,9 +129,15 @@ Google Sheets reads them as durations. Paste columns A–D into the round's tab.
 ```
 
 ```
-parkrun_id,name,position,time,time_seconds,age_grade,age_group,gender,achievement
-2651054,Chris FAAST,1,17:27,1047,81.28%,VM45-49,Male,New PB!
+parkrun_id,name,position,time,time_seconds,age_grade,age_group,gender,achievement,lifetime_pb
+2651054,Chris FAAST,1,17:27,1047,81.28%,VM45-49,Male,New PB!,
+3644320,Joseph MACHARIA,21,19:05,1145,77.90%,VM50-54,Male,First Timer!,yes
 ```
+
+For each first timer at the course, the script also reads their parkrun
+history: `lifetime_pb` is `yes` when the run beats every parkrun they ran
+before (a first ever parkrun doesn't count). `--sheet` writes `Yes` in the
+PB? column for these too.
 
 ### 4. Score the round
 
@@ -255,7 +263,8 @@ E–M are formulas (row 2 shown, fill down):
   runners; use `--delay 3` for big batches. If you get blocked, wait a few
   hours.
 - **"First Timer!"** in parkrun's results means the first run *at that
-  course*, not the first parkrun ever.
+  course*, not the first parkrun ever. parkrun never flags those as a PB,
+  which is why `event_results.py` checks first timers' history itself.
 - `baseline-avg.py` reads the "Most Recent parkruns" table, which only shows
   about the last 10 runs, so `--before` can't reach far into the past.
   `baseline_fastest.py` reads the full results history.

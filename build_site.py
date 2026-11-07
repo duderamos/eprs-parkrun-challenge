@@ -188,8 +188,8 @@ def rules():
 compared to your handicap, and the more you beat it, the higher you place.</li>
 <li><b>Points:</b> 1st = 10, 2nd = 8, 3rd = 6, 4th = 5, 5th = 4, 6th = 3, 7th = 2,
 everyone else who finishes = 1.</li>
-<li><b>Speed bonus:</b> the first 3 EPRS runners across the line get +3, +2, +1.</li>
-<li><b>PB bonus:</b> +1 for a course PB. A first run at that course doesn't count.</li>
+<li><b>Speed bonus:</b> the 3 fastest EPRS times get +3, +2, +1. Equal times share the place.</li>
+<li><b>PB bonus:</b> +1 for a course PB, or for a lifetime PB on a first run at the course.</li>
 <li><b>Age-grade bonus:</b> +2 for the highest age grade among EPRS runners who
 didn't get a speed bonus.</li>
 <li>Your best {ROUNDS_COUNTED} rounds count. Minimum {MIN_ROUNDS_TO_WIN} rounds to win.

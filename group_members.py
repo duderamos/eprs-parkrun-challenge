@@ -63,7 +63,7 @@ def main():
     p = GroupParser()
     p.feed(fetch(url))
 
-    out = csv.writer(sys.stdout)
+    out = csv.writer(sys.stdout, lineterminator="\n")
     out.writerow(["id", "name"])
     seen = set()
     for rid, name in p.members:
