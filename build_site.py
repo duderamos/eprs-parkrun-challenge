@@ -70,6 +70,9 @@ tr.divider td { background: var(--accent-soft); color: var(--accent); font-size:
 .dropped { text-decoration: line-through; color: var(--muted); }
 .zero { color: var(--muted); }
 .faster { color: var(--good); }
+.hc .chg { display: inline-block; width: 44px; margin-left: 4px; text-align: left;
+           font-size: 11px; }
+.hc th:not(.name) { padding-right: 58px; }
 .slower { color: var(--bad); }
 details { margin-top: 12px; }
 summary { cursor: pointer; font-weight: 600; padding: 10px 0; }
@@ -165,18 +168,38 @@ def round_table(points):
     return "".join(out)
 
 
-def handicaps_table(current, start):
-    before = {r["parkrun_id"]: float(r["baseline_seconds"]) for r in start}
-    out = ['<table><thead><tr><th class="name">Runner</th><th>Round 1</th>'
-           '<th>Now</th><th>Change</th></tr></thead><tbody>']
-    for r in current:
-        secs = float(r["baseline_seconds"])
-        first = before.get(r["parkrun_id"], secs)
-        # Handicaps only ever get tightened, so any change is a cut.
-        change = (f'<td class="faster">−{first - secs:.0f}s</td>' if secs != first
-                  else '<td class="zero">–</td>')
-        out.append(f'<tr><td class="name">{esc(r["name"])}</td><td>{fmt_time(first)}</td>'
-                   f'<td>{fmt_time(secs)}</td>{change}</tr>')
+def fmt_change(secs):
+    sign = "−" if secs < 0 else "+"
+    secs = abs(round(secs))
+    return f"{sign}{fmt_time(secs)}" if secs >= 60 else f"{sign}{secs}s"
+
+
+def handicaps_table(rounds, handicaps):
+    """One column per round, so each round's adjustment shows where it happened."""
+    events = {int(r["round"]): r["event"].title() for r in rounds}
+    numbers = sorted(handicaps)
+    by_round = {n: {h["parkrun_id"]: float(h["baseline_seconds"]) for h in handicaps[n]}
+                for n in numbers}
+    head = "".join(f'<th title="{esc(events.get(n, "Next round"))}">'
+                   f'R{n}{"" if n in events else " (next)"}</th>' for n in numbers)
+    out = [f'<table class="hc"><thead><tr><th class="name">Runner</th>{head}</tr></thead><tbody>']
+    for h in handicaps[numbers[-1]]:
+        rid = h["parkrun_id"]
+        cells = []
+        prev = None
+        for n in numbers:
+            secs = by_round[n].get(rid)
+            # The change sits in a fixed-width slot, empty when there's none,
+            # so the times line up down each column.
+            if secs is None:
+                cells.append('<td class="zero">–<span class="chg"></span></td>')
+            elif prev is None or secs == prev:
+                cells.append(f'<td class="zero">{fmt_time(secs)}<span class="chg"></span></td>')
+            else:
+                cells.append(f'<td class="faster">{fmt_time(secs)}'
+                             f'<span class="chg">{fmt_change(secs - prev)}</span></td>')
+            prev = secs if secs is not None else prev
+        out.append(f'<tr><td class="name">{esc(h["name"])}</td>{"".join(cells)}</tr>')
     out.append("</tbody></table>")
     return "".join(out)
 
@@ -236,9 +259,10 @@ def build():
     upcoming = max(handicaps)
     if upcoming > 1:
         parts.append(
-            f'<h2 id="handicaps">Handicaps for round {upcoming}</h2>'
-            f'<p>How much each handicap has been tightened since round 1.</p>'
-            f'<div class="card">{handicaps_table(handicaps[upcoming], handicaps[1])}</div>')
+            f'<h2 id="handicaps">Handicaps</h2>'
+            f'<p>Each round\'s handicaps, with the change from the round before. '
+            f'R{upcoming} is next round\'s.</p>'
+            f'<div class="card">{handicaps_table(rounds, handicaps)}</div>')
 
     parts.append(f'<h2 id="rules">Rules</h2>{rules()}')
     updated = datetime.now(timezone.utc).strftime("%-d %b %Y %H:%M UTC")
