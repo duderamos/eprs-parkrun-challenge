@@ -1,0 +1,1414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EPRS Parkrun Challenge 2026 — Live Track Replay</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      color-scheme: light;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(circle at top, #ecfdf5 0%, #f0fdf4 35%, #f8fafc 100%);
+      color: #0f172a;
+      overflow-x: hidden;
+    }
+
+    .arcade-font {
+      font-family: 'Fredoka', 'Inter', sans-serif;
+    }
+
+    /* Parallel Track Lane Styling */
+    .track-surface {
+      background: repeating-linear-gradient(
+        to bottom,
+        #d95338 0px,
+        #d95338 56px,
+        #c8472e 56px,
+        #c8472e 112px
+      );
+      position: relative;
+      box-shadow: inset 0 4px 16px rgba(0, 0, 0, 0.22);
+    }
+
+    .track-lane {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 56px;
+      border-bottom: 2px dashed rgba(255, 255, 255, 0.78);
+      will-change: transform;
+      transition: transform 750ms cubic-bezier(0.22, 1, 0.36, 1), background-color 250ms ease;
+    }
+
+    .track-lane:hover {
+      background-color: rgba(255, 255, 255, 0.14);
+    }
+
+    /* Checkered Finish Line Pattern */
+    .finish-checkers {
+      background-image:
+        linear-gradient(45deg, #0f172a 25%, transparent 25%),
+        linear-gradient(-45deg, #0f172a 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #0f172a 75%),
+        linear-gradient(-45deg, transparent 75%, #0f172a 75%);
+      background-size: 12px 12px;
+      background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+      background-color: #ffffff;
+    }
+
+    /* Runner horizontal movement along lane */
+    .runner-mover {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      will-change: left;
+      transition: left 900ms cubic-bezier(0.34, 1.32, 0.64, 1);
+      z-index: 15;
+    }
+
+    /* Flip runner emojis so they face RIGHT (from left start to right finish) */
+    .runner-sprite {
+      display: inline-block;
+      transform: scaleX(-1);
+      font-size: 1.75rem;
+      line-height: 1;
+      filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.35));
+      user-select: none;
+    }
+
+    /* Bouncy cartoon running gait */
+    @keyframes cartoonBob {
+      0%, 100% {
+        transform: translateY(0px) rotate(0deg);
+      }
+      25% {
+        transform: translateY(-5px) rotate(4deg);
+      }
+      50% {
+        transform: translateY(0px) rotate(0deg);
+      }
+      75% {
+        transform: translateY(-4px) rotate(-3deg);
+      }
+    }
+
+    @keyframes idleBreathe {
+      0%, 100% {
+        transform: translateY(0px) scale(1);
+      }
+      50% {
+        transform: translateY(-2px) scale(1.03);
+      }
+    }
+
+    @keyframes dustPuff {
+      0% {
+        opacity: 0.95;
+        transform: translateX(0) scale(0.7);
+      }
+      100% {
+        opacity: 0;
+        transform: translateX(-18px) scale(1.35);
+      }
+    }
+
+    @keyframes crownFloat {
+      0%, 100% {
+        transform: translateY(0px) rotate(-6deg);
+      }
+      50% {
+        transform: translateY(-3px) rotate(6deg);
+      }
+    }
+
+    .bobbing-fast {
+      animation: cartoonBob var(--bob-speed, 0.38s) infinite ease-in-out;
+    }
+
+    .bobbing-idle {
+      animation: idleBreathe 1.4s infinite ease-in-out;
+    }
+
+    .dust-cloud {
+      animation: dustPuff 0.65s infinite ease-out;
+    }
+
+    .crown-wiggle {
+      animation: crownFloat 1.2s infinite ease-in-out;
+    }
+
+    /* Custom subtle scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-amber-200 selection:text-slate-900">
+
+  <!-- Arcade Sports Scoreboard Header -->
+  <header class="bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-700 text-white border-b-4 border-amber-400 shadow-md sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2.5">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center text-2xl shadow-inner border-2 border-white shrink-0">
+          🏁
+        </div>
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="arcade-font text-lg sm:text-2xl font-bold tracking-wide text-white drop-shadow-xs">
+              EPRS Parkrun Challenge 2026 — Live Track Replay
+            </h1>
+            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold uppercase tracking-wider bg-amber-400 text-slate-950 shadow-2xs">
+              4 / 5 Stages Done
+            </span>
+          </div>
+          <p class="text-xs text-emerald-100 font-medium">
+            Sprint left-to-right! Best 4 rounds count &bull; Need &ge;3 rounds to qualify for the trophy 🏆
+          </p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 self-start md:self-auto">
+        <button
+          id="sound-toggle-btn"
+          type="button"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-950/60 hover:bg-emerald-950/80 text-amber-300 border border-emerald-500/50 transition cursor-pointer"
+          title="Toggle Arcade Sound Effects"
+        >
+          <span id="sound-icon">🔇</span>
+          <span id="sound-label">SFX Off</span>
+        </button>
+
+        <a
+          href="https://duderamos.com/eprs-parkrun-challenge/"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white/15 hover:bg-white/25 text-white border border-white/25 transition"
+        >
+          <span>Official Results</span>
+          <span>↗</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 space-y-4">
+
+    <!-- Race Announcer / Commentary Ticker Banner -->
+    <section class="bg-slate-900 text-white rounded-2xl border-2 border-amber-400 shadow-md px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+      <div class="flex items-start sm:items-center gap-3">
+        <span class="px-2.5 py-1 rounded-lg bg-rose-600 text-white text-[11px] font-black uppercase tracking-wider shrink-0 animate-pulse">
+          🎙️ LIVE CALL
+        </span>
+        <div>
+          <div id="announcer-stage" class="text-xs font-bold text-amber-300 uppercase tracking-wider">
+            STARTING BLOCKS — READY TO SPRINT!
+          </div>
+          <p id="announcer-text" class="arcade-font text-sm sm:text-base font-medium text-white leading-snug">
+            All 24 runners are lined up at the starting blocks! Hit Play or click a stage to watch them bolt!
+          </p>
+        </div>
+      </div>
+      <div class="text-right shrink-0 hidden md:block">
+        <span class="text-[11px] uppercase tracking-wider text-slate-400 font-bold block">Leader</span>
+        <span id="announcer-leader" class="arcade-font text-base font-bold text-amber-400">On Your Marks!</span>
+      </div>
+    </section>
+
+    <!-- Control Deck -->
+    <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-3.5 sm:p-4 space-y-3.5">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <!-- Playback Buttons -->
+        <div class="flex flex-wrap items-center gap-2">
+          <button
+            id="play-pause-btn"
+            type="button"
+            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-extrabold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 shadow-sm transition cursor-pointer"
+          >
+            <span id="play-pause-icon">⏸️</span>
+            <span id="play-pause-text">Pause</span>
+          </button>
+
+          <button
+            id="replay-btn"
+            type="button"
+            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 active:scale-95 border border-slate-200 transition cursor-pointer"
+          >
+            <span>🔄</span>
+            <span>Replay</span>
+          </button>
+
+          <!-- Speed Toggle -->
+          <div class="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200" role="group" aria-label="Playback speed">
+            <button type="button" data-speed="0.5" class="speed-btn px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer text-slate-600">0.5x</button>
+            <button type="button" data-speed="1" class="speed-btn px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer bg-white text-slate-900 shadow-2xs">1x</button>
+            <button type="button" data-speed="2" class="speed-btn px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer text-slate-600">2x Turbo</button>
+          </div>
+        </div>
+
+        <!-- View Mode & Filter Toggles -->
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Sort Lanes Toggle -->
+          <button
+            id="sort-mode-btn"
+            type="button"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-100 text-amber-950 border border-amber-300 hover:bg-amber-200/80 transition cursor-pointer"
+          >
+            <span id="sort-mode-icon">📶</span>
+            <span id="sort-mode-label">Lanes: Sorted by Rank</span>
+          </button>
+
+          <!-- Runner Count Filter -->
+          <div class="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200" role="group" aria-label="Runner filter">
+            <button type="button" data-filter="all" class="filter-btn px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer bg-white text-slate-900 shadow-2xs">All 24</button>
+            <button type="button" data-filter="qualified" class="filter-btn px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer text-slate-600">Top 15 (&ge;3 Rds)</button>
+            <button type="button" data-filter="top10" class="filter-btn px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer text-slate-600">Top 10</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stage Selector Pills + Scrubber -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center pt-2 border-t border-slate-100">
+        <div class="lg:col-span-8 flex flex-wrap gap-1.5">
+          <button type="button" data-stage="0" class="stage-btn px-3 py-1.5 rounded-xl text-xs font-extrabold border transition cursor-pointer">
+            🚦 Start (0)
+          </button>
+          <button type="button" data-stage="1" class="stage-btn px-3 py-1.5 rounded-xl text-xs font-extrabold border transition cursor-pointer">
+            1️⃣ R1: Kedron
+          </button>
+          <button type="button" data-stage="2" class="stage-btn px-3 py-1.5 rounded-xl text-xs font-extrabold border transition cursor-pointer">
+            2️⃣ R2: Bunyaville
+          </button>
+          <button type="button" data-stage="3" class="stage-btn px-3 py-1.5 rounded-xl text-xs font-extrabold border transition cursor-pointer">
+            3️⃣ R3: Sandgate
+          </button>
+          <button type="button" data-stage="4" class="stage-btn px-3 py-1.5 rounded-xl text-xs font-extrabold border transition cursor-pointer">
+            4️⃣ R4: Samfordparklands
+          </button>
+        </div>
+
+        <div class="lg:col-span-4 flex items-center gap-2.5">
+          <span class="text-xs font-bold text-slate-500 whitespace-nowrap">Scrub:</span>
+          <input
+            id="stage-slider"
+            type="range"
+            min="0"
+            max="4"
+            step="1"
+            value="0"
+            class="w-full accent-emerald-600 h-2 bg-slate-200 rounded-lg cursor-pointer"
+            aria-label="Scrub race stage"
+          />
+          <span id="stage-readout" class="text-xs font-extrabold text-slate-800 whitespace-nowrap">Start</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Legend Strip -->
+    <div class="flex flex-wrap items-center justify-between gap-2 px-1 text-xs font-semibold text-slate-600">
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span class="inline-flex items-center gap-1">👑 #1 Leader</span>
+        <span class="inline-flex items-center gap-1">🔥 10+ pt Stage Surge</span>
+        <span class="inline-flex items-center gap-1">💨 Fast Stage Gain</span>
+        <span class="inline-flex items-center gap-1">⏳ &lt;3 Rounds (Not yet qualified)</span>
+      </div>
+      <div class="text-emerald-800 font-bold">
+        💡 Click any runner's lane for their Bib Card!
+      </div>
+    </div>
+
+    <!-- THE RUNNING TRACK STADIUM -->
+    <section class="rounded-3xl border-4 border-emerald-700 bg-emerald-600 p-2 sm:p-3 shadow-xl overflow-hidden">
+      <!-- Top Grass Border & Distance Flags -->
+      <div class="bg-emerald-700/90 text-white rounded-t-2xl px-2 py-2 flex items-center border-b-2 border-white/60">
+        <!-- Left Runner Info Header -->
+        <div class="w-40 sm:w-56 shrink-0 flex items-center justify-between pr-3 text-[11px] font-black uppercase tracking-wider text-emerald-100">
+          <span>Lane / Runner</span>
+          <span>Rds</span>
+        </div>
+
+        <!-- Track Distance Ruler (0 to 25 pts) -->
+        <div class="flex-1 relative h-6 flex items-center text-[11px] font-extrabold">
+          <div class="absolute left-0 -translate-x-1/2 flex flex-col items-center">
+            <span class="bg-white text-slate-900 px-1.5 py-0.2 rounded text-[10px]">START</span>
+          </div>
+          <div class="absolute left-[20%] -translate-x-1/2 text-emerald-100">🚩 5 pts</div>
+          <div class="absolute left-[40%] -translate-x-1/2 text-emerald-100">🚩 10 pts</div>
+          <div class="absolute left-[60%] -translate-x-1/2 text-emerald-100">🚩 15 pts</div>
+          <div class="absolute left-[80%] -translate-x-1/2 text-emerald-100">🚩 20 pts</div>
+          <div class="absolute right-0 translate-x-1/4 flex items-center gap-0.5 bg-amber-400 text-slate-950 px-1.5 py-0.5 rounded text-[10px] shadow-2xs">
+            <span>🏁 25</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Parallel Clay Lanes Container -->
+      <div id="track-lanes-wrapper" class="track-surface rounded-b-2xl overflow-hidden transition-[height] duration-500">
+        <!-- Vertical Distance Gridlines across the track -->
+        <div class="pointer-events-none absolute inset-y-0 left-40 sm:left-56 right-6 sm:right-10">
+          <!-- Start line -->
+          <div class="absolute inset-y-0 left-0 w-1 bg-white/90"></div>
+          <!-- 5, 10, 15, 20 pt markers -->
+          <div class="absolute inset-y-0 left-[20%] border-l border-dashed border-white/30"></div>
+          <div class="absolute inset-y-0 left-[40%] border-l border-dashed border-white/30"></div>
+          <div class="absolute inset-y-0 left-[60%] border-l border-dashed border-white/30"></div>
+          <div class="absolute inset-y-0 left-[80%] border-l border-dashed border-white/30"></div>
+          <!-- Checkered Finish Line at 25 pts -->
+          <div class="absolute inset-y-0 right-0 w-3 finish-checkers opacity-90 shadow-md"></div>
+        </div>
+
+        <!-- Dynamic Runner Lanes Injected Here -->
+        <div id="lanes-container" class="relative w-full"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Runner Bib Card Modal -->
+  <div
+    id="bib-modal"
+    class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="bib-runner-name"
+  >
+    <div class="bg-white rounded-3xl border-4 border-slate-900 max-w-md w-full shadow-2xl overflow-hidden transform transition-all">
+      <!-- Bib Header -->
+      <div class="bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-300 px-5 py-4 border-b-2 border-slate-900 flex items-center justify-between">
+        <div>
+          <span class="text-[10px] font-black uppercase tracking-widest text-slate-800 block">
+            EPRS PARKRUN CHALLENGE 2026
+          </span>
+          <h2 id="bib-runner-name" class="arcade-font text-2xl font-bold text-slate-950 leading-tight">
+            JOSEPH MACHARIA
+          </h2>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="bg-slate-900 text-amber-400 px-3 py-1.5 rounded-2xl text-center">
+            <span class="text-[9px] uppercase font-bold block text-slate-300">BIB</span>
+            <span id="bib-number" class="arcade-font text-lg font-black leading-none">#01</span>
+          </div>
+          <button
+            id="close-bib-btn"
+            type="button"
+            class="w-9 h-9 rounded-full bg-slate-900/10 hover:bg-slate-900/20 text-slate-900 font-black text-lg flex items-center justify-center cursor-pointer"
+            aria-label="Close Bib Card"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+
+      <!-- Bib Body -->
+      <div class="p-5 space-y-4">
+        <div class="flex items-center justify-between bg-slate-50 rounded-2xl p-3.5 border border-slate-200">
+          <div>
+            <div class="text-xs font-bold text-slate-500 uppercase">Qualification Status</div>
+            <div id="bib-qual-status" class="text-sm font-extrabold text-emerald-700 mt-0.5">
+              ✅ Qualified (3/4 rounds completed)
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-xs font-bold text-slate-500 uppercase">Best 4 Total</div>
+            <div id="bib-total-pts" class="arcade-font text-3xl font-bold text-slate-900">24 pts</div>
+          </div>
+        </div>
+
+        <!-- Stage-by-Stage Breakdown -->
+        <div class="space-y-2">
+          <div class="text-xs font-extrabold uppercase tracking-wider text-slate-500">
+            Stage-by-Stage Splits &amp; Points
+          </div>
+          <div id="bib-stages-list" class="space-y-2">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <div class="text-[11px] text-slate-500 bg-amber-50 border border-amber-200 rounded-xl p-2.5">
+          <strong>Scoring Rule:</strong> Points combine Place + Speed + PB + Age Grade bonuses. Best 4 of 5 rounds count, and at least 3 rounds are required to win.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // 1. OFFICIAL STAGE & RUNNER DATASET (ROUNDS 1 TO 4)
+    // =========================================================================
+    const STAGES = [
+      {
+        stage: 0,
+        shortLabel: 'Start',
+        bannerTitle: 'STARTING BLOCKS — 0 POINTS',
+        commentary: 'All 24 EPRS runners are bouncing on their toes at the start line! Hit Play or click R1 to fire the starter pistol!',
+        leaderText: 'On Your Marks!'
+      },
+      {
+        stage: 1,
+        shortLabel: 'R1: Kedron',
+        bannerTitle: 'ROUND 1 — KEDRON PARKRUN (3 OCT 2026)',
+        commentary: 'BANG! Jason Hartwich (13 pts) and Robert McNab (12 pts) bolt out of the blocks at Kedron, with Faast, Poole & Phil Shield chasing on 6 pts!',
+        leaderText: 'Jason HARTWICH (13 pts)'
+      },
+      {
+        stage: 2,
+        shortLabel: 'R2: Bunyaville',
+        bannerTitle: 'ROUND 2 — BUNYAVILLE PARKRUN (17 OCT 2026)',
+        commentary: 'Chris Faast blazes up the Bunyaville hills for 12 pts to take the overall lead (18 pts), while Neil Thorpe rockets in with 11 pts!',
+        leaderText: 'Chris FAAST (18 pts)'
+      },
+      {
+        stage: 3,
+        shortLabel: 'R3: Sandgate',
+        bannerTitle: 'ROUND 3 — SANDGATE PARKRUN (7 NOV 2026)',
+        commentary: 'Coastal speed at Sandgate! Jason Hartwich reclaims the lead on 20 pts, Phil Shield surges with 8 pts, and Joseph Macharia drops an 11-pt bomb!',
+        leaderText: 'Jason HARTWICH (20 pts)'
+      },
+      {
+        stage: 4,
+        shortLabel: 'R4: Samfordparklands',
+        bannerTitle: 'ROUND 4 — SAMFORDPARKLANDS (21 NOV 2026)',
+        commentary: 'PHOTO FINISH! Joseph Macharia fires another 11-pt sprint to tie Jason Hartwich at 24 pts — taking #1 on the Round 4 countback (11 vs 4)!',
+        leaderText: 'Joseph MACHARIA (24 pts)'
+      }
+    ];
+
+    const RUNNERS = [
+      {
+        id: 'joseph-macharia',
+        bib: 1,
+        name: 'Joseph MACHARIA',
+        gender: 'M',
+        points: [0, 2, 11, 11],
+        details: [
+          'Did not run R1',
+          '2 pts (Place + Age Grade)',
+          '11 pts (Fast Sandgate surge)',
+          '11 pts (Samfordparklands flyer)'
+        ]
+      },
+      {
+        id: 'jason-hartwich',
+        bib: 2,
+        name: 'Jason HARTWICH',
+        gender: 'M',
+        points: [13, 3, 4, 4],
+        details: [
+          '13 pts (-45s under handicap!)',
+          '3 pts (Consistent Bunyaville)',
+          '4 pts (Sandgate points)',
+          '4 pts (All 4 rounds completed)'
+        ]
+      },
+      {
+        id: 'tim-poole',
+        bib: 3,
+        name: 'Tim POOLE',
+        gender: 'M',
+        points: [6, 4, 7, 4],
+        details: [
+          '6 pts (Strong Kedron opener)',
+          '4 pts (Steady climb)',
+          '7 pts (Sandgate speed bonus)',
+          '4 pts (All 4 rounds completed)'
+        ]
+      },
+      {
+        id: 'chris-faast',
+        bib: 4,
+        name: 'Chris FAAST',
+        gender: 'M',
+        points: [6, 12, 1, 2],
+        details: [
+          '6 pts (Kedron opener)',
+          '12 pts (Bunyaville stage star!)',
+          '1 pt (Sandgate finisher)',
+          '2 pts (All 4 rounds completed)'
+        ]
+      },
+      {
+        id: 'phil-shield',
+        bib: 5,
+        name: 'Phil SHIELD',
+        gender: 'M',
+        points: [6, 0, 8, 5],
+        details: [
+          '6 pts (Kedron opener)',
+          'Did not run R2',
+          '8 pts (Big Sandgate haul)',
+          '5 pts (Qualified on 3 rounds)'
+        ]
+      },
+      {
+        id: 'neil-thorpe',
+        bib: 6,
+        name: 'Neil THORPE',
+        gender: 'M',
+        points: [0, 11, 5, 2],
+        details: [
+          'Did not run R1',
+          '11 pts (Bunyaville rocket!)',
+          '5 pts (Sandgate points)',
+          '2 pts (Qualified on 3 rounds)'
+        ]
+      },
+      {
+        id: 'robert-mcnab',
+        bib: 7,
+        name: 'Robert MCNAB',
+        gender: 'M',
+        points: [12, 1, 5, 0],
+        details: [
+          '12 pts (Kedron fast start)',
+          '1 pt (Bunyaville finisher)',
+          '5 pts (Qualified on 3 rounds)',
+          'Did not run R4'
+        ]
+      },
+      {
+        id: 'christian-fermanov',
+        bib: 8,
+        name: 'Christian FERMANOV',
+        gender: 'M',
+        points: [0, 5, 3, 5],
+        details: [
+          'Did not run R1',
+          '5 pts (Bunyaville debut)',
+          '3 pts (Sandgate points)',
+          '5 pts (Qualified on 3 rounds)'
+        ]
+      },
+      {
+        id: 'peter-hosking',
+        bib: 9,
+        name: 'Peter HOSKING',
+        gender: 'M',
+        points: [1, 5, 2, 2],
+        details: [
+          '1 pt (Kedron opener)',
+          '5 pts (Bunyaville boost)',
+          '2 pts (Sandgate points)',
+          '2 pts (All 4 rounds completed)'
+        ]
+      },
+      {
+        id: 'mark-reynolds',
+        bib: 10,
+        name: 'Mark REYNOLDS',
+        gender: 'M',
+        points: [0, 1, 6, 2],
+        details: [
+          'Did not run R1',
+          '1 pt (Bunyaville)',
+          '6 pts (Sandgate surge)',
+          '2 pts (Qualified on 3 rounds)'
+        ]
+      },
+      {
+        id: 'michael-kettle',
+        bib: 11,
+        name: 'Michael KETTLE',
+        gender: 'M',
+        points: [2, 0, 2, 3],
+        details: [
+          '2 pts (Kedron)',
+          'Did not run R2',
+          '2 pts (Sandgate)',
+          '3 pts (Qualified on 3 rounds)'
+        ]
+      },
+      {
+        id: 'jon-melloy',
+        bib: 12,
+        name: 'Jon MELLOY',
+        gender: 'M',
+        points: [2, 2, 1, 1],
+        details: [
+          '2 pts (Kedron)',
+          '2 pts (Bunyaville)',
+          '1 pt (Sandgate)',
+          '1 pt (All 4 rounds completed)'
+        ]
+      },
+      {
+        id: 'eduardo-ramos',
+        bib: 13,
+        name: 'Eduardo RAMOS',
+        gender: 'M',
+        points: [4, 1, 1, 0],
+        details: [
+          '4 pts (Kedron)',
+          '1 pt (Bunyaville)',
+          '1 pt (Qualified on 3 rounds)',
+          'Did not run R4'
+        ]
+      },
+      {
+        id: 'alexa-shield',
+        bib: 14,
+        name: 'Alexa SHIELD',
+        gender: 'F',
+        points: [2, 0, 1, 1],
+        details: [
+          '2 pts (Kedron)',
+          'Did not run R2',
+          '1 pt (Sandgate)',
+          '1 pt (Qualified on 3 rounds)'
+        ]
+      },
+      {
+        id: 'sam-kruger',
+        bib: 15,
+        name: 'Sam KRUGER',
+        gender: 'M',
+        points: [1, 0, 1, 1],
+        details: [
+          '1 pt (Kedron)',
+          'Did not run R2',
+          '1 pt (Sandgate)',
+          '1 pt (Qualified on 3 rounds)'
+        ]
+      },
+      {
+        id: 'jackson-clark',
+        bib: 16,
+        name: 'Jackson CLARK',
+        gender: 'M',
+        points: [0, 9, 0, 11],
+        details: [
+          'Did not run R1',
+          '9 pts (Bunyaville flyer)',
+          'Did not run R3',
+          '11 pts (Needs 1 more round!)'
+        ]
+      },
+      {
+        id: 'marcel-sahyoun',
+        bib: 17,
+        name: 'Marcel SAHYOUNE',
+        gender: 'M',
+        points: [0, 0, 1, 7],
+        details: [
+          'Did not run R1',
+          'Did not run R2',
+          '1 pt (Sandgate)',
+          '7 pts (Needs 1 more round!)'
+        ]
+      },
+      {
+        id: 'ryan-mooney',
+        bib: 18,
+        name: 'Ryan MOONEY',
+        gender: 'M',
+        points: [0, 0, 1, 4],
+        details: [
+          'Did not run R1',
+          'Did not run R2',
+          '1 pt (Sandgate)',
+          '4 pts (Needs 1 more round!)'
+        ]
+      },
+      {
+        id: 'luke-anderson',
+        bib: 19,
+        name: 'Luke ANDERSON',
+        gender: 'M',
+        points: [0, 1, 4, 0],
+        details: [
+          'Did not run R1',
+          '1 pt (Bunyaville)',
+          '4 pts (Sandgate)',
+          'Did not run R4 (2 rounds)'
+        ]
+      },
+      {
+        id: 'eoin-dixon',
+        bib: 20,
+        name: 'Eoin DIXON',
+        gender: 'M',
+        points: [4, 0, 1, 0],
+        details: [
+          '4 pts (Kedron)',
+          'Did not run R2',
+          '1 pt (Sandgate)',
+          'Did not run R4 (2 rounds)'
+        ]
+      },
+      {
+        id: 'paul-fleming',
+        bib: 21,
+        name: 'Paul FLEMING',
+        gender: 'M',
+        points: [0, 1, 1, 0],
+        details: [
+          'Did not run R1',
+          '1 pt (Bunyaville)',
+          '1 pt (Sandgate)',
+          'Did not run R4 (2 rounds)'
+        ]
+      },
+      {
+        id: 'ryan-pedlow',
+        bib: 22,
+        name: 'Ryan PEDLOW',
+        gender: 'M',
+        points: [0, 0, 0, 1],
+        details: [
+          'Did not run R1',
+          'Did not run R2',
+          'Did not run R3',
+          '1 pt (Samfordparklands debut)'
+        ]
+      },
+      {
+        id: 'stephen-anderson',
+        bib: 23,
+        name: 'Stephen ANDERSON',
+        gender: 'M',
+        points: [0, 0, 1, 0],
+        details: [
+          'Did not run R1',
+          'Did not run R2',
+          '1 pt (Sandgate debut)',
+          'Did not run R4'
+        ]
+      },
+      {
+        id: 'mark-huth',
+        bib: 24,
+        name: 'Mark HUTH',
+        gender: 'M',
+        points: [0, 0, 1, 0],
+        details: [
+          'Did not run R1',
+          'Did not run R2',
+          '1 pt (Sandgate debut)',
+          'Did not run R4'
+        ]
+      }
+    ];
+
+    // =========================================================================
+    // 2. ARCADE SYNTHESIZED WEB AUDIO SOUND EFFECTS (POLITE, DEFAULT MUTED)
+    // =========================================================================
+    class ArcadeSound {
+      constructor() {
+        this.enabled = false;
+        this.ctx = null;
+      }
+
+      toggle() {
+        this.enabled = !this.enabled;
+        if (this.enabled && !this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) this.ctx = new AudioCtx();
+        }
+        if (this.enabled && this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+        if (this.enabled) {
+          this.playBeep(520, 0.08, 'triangle');
+        }
+        return this.enabled;
+      }
+
+      playBeep(freq = 440, duration = 0.09, type = 'sine', delay = 0) {
+        if (!this.enabled || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime + delay;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, now);
+          gain.gain.setValueAtTime(0.08, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + duration);
+        } catch (e) {
+          // Ignore audio restrictions if blocked
+        }
+      }
+
+      playStageAdvance(stage) {
+        if (!this.enabled) return;
+        if (stage === 0) {
+          this.playBeep(330, 0.08, 'triangle', 0);
+        } else if (stage === 4) {
+          // Fanfare for final completed stage
+          this.playBeep(523.25, 0.1, 'triangle', 0);
+          this.playBeep(659.25, 0.1, 'triangle', 0.1);
+          this.playBeep(783.99, 0.12, 'triangle', 0.2);
+          this.playBeep(1046.5, 0.25, 'triangle', 0.32);
+        } else {
+          // Upward sprint chirp
+          this.playBeep(440, 0.07, 'sine', 0);
+          this.playBeep(587.33, 0.1, 'sine', 0.07);
+        }
+      }
+    }
+
+    const sfx = new ArcadeSound();
+
+    // =========================================================================
+    // 3. STATE & LEADERBOARD COMPUTATION
+    // =========================================================================
+    const LANE_HEIGHT = 56;
+    const MAX_TRACK_POINTS = 25;
+
+    const state = {
+      stage: 0,               // 0 = Start, 1 = R1, 2 = R2, 3 = R3, 4 = R4
+      isPlaying: true,
+      speedMultiplier: 1,     // 0.5, 1, 2
+      sortByRank: true,       // true = dynamic lane swaps, false = fixed lanes 1..24
+      filterMode: 'all',      // 'all' | 'qualified' | 'top10'
+      timerId: null
+    };
+
+    /**
+     * Computes runner metrics at `stage` (0..4).
+     * At stage 4, official tie-breaker prioritizes qualified runners (>=3 rounds) first,
+     * then best-4 total, then most recent round score (R4 -> R3 -> R2 -> R1).
+     */
+    function computeRunnerAtStage(runner, stage) {
+      if (stage === 0) {
+        return {
+          ...runner,
+          totalPoints: 0,
+          roundsRun: 0,
+          stageDelta: 0,
+          isQualified: false,
+          recentScores: [0, 0, 0, 0]
+        };
+      }
+
+      const slice = runner.points.slice(0, stage);
+      const roundsRun = slice.filter((p) => p > 0).length;
+      const best4 = [...slice].sort((a, b) => b - a).slice(0, 4);
+      const totalPoints = best4.reduce((acc, v) => acc + v, 0);
+      const stageDelta = runner.points[stage - 1] || 0;
+
+      // In final stage 4, official standings place 3+ round qualified runners in top 15
+      const isQualified = roundsRun >= 3;
+
+      return {
+        ...runner,
+        totalPoints,
+        roundsRun,
+        stageDelta,
+        isQualified
+      };
+    }
+
+    function getOrderedRunners() {
+      const computed = RUNNERS.map((r) => computeRunnerAtStage(r, state.stage));
+
+      // Sort to determine official rank at current stage
+      const ranked = [...computed].sort((a, b) => {
+        if (state.stage === 0) return a.bib - b.bib;
+
+        // At stage 4 (official current table), qualified runners (>=3 rounds) rank ahead of <3 round runners
+        if (state.stage === 4 && a.isQualified !== b.isQualified) {
+          return a.isQualified ? -1 : 1;
+        }
+
+        if (b.totalPoints !== a.totalPoints) {
+          return b.totalPoints - a.totalPoints;
+        }
+
+        // Tiebreaker: most recent stage score backwards (R4 -> R3 -> R2 -> R1)
+        for (let idx = state.stage - 1; idx >= 0; idx--) {
+          if (b.points[idx] !== a.points[idx]) {
+            return b.points[idx] - a.points[idx];
+          }
+        }
+
+        return a.bib - b.bib;
+      });
+
+      // Assign rank numbers
+      const rankMap = new Map();
+      ranked.forEach((r, i) => rankMap.set(r.id, i + 1));
+
+      const withRanks = computed.map((r) => ({
+        ...r,
+        rank: rankMap.get(r.id)
+      }));
+
+      // Filter list based on filterMode
+      let visible = withRanks;
+      if (state.filterMode === 'qualified') {
+        visible = withRanks.filter((r) => r.roundsRun >= 3 || (state.stage < 3 && r.bib <= 15));
+      } else if (state.filterMode === 'top10') {
+        visible = withRanks.filter((r) => r.rank <= 10);
+      }
+
+      // Order lanes either dynamically by rank or fixed by Bib #1..24
+      if (state.sortByRank && state.stage > 0) {
+        visible.sort((a, b) => a.rank - b.rank);
+      } else {
+        visible.sort((a, b) => a.bib - b.bib);
+      }
+
+      return visible;
+    }
+
+    // =========================================================================
+    // 4. DOM REFERENCES & TRACK RENDERING
+    // =========================================================================
+    const trackWrapper = document.getElementById('track-lanes-wrapper');
+    const lanesContainer = document.getElementById('lanes-container');
+    const announcerStage = document.getElementById('announcer-stage');
+    const announcerText = document.getElementById('announcer-text');
+    const announcerLeader = document.getElementById('announcer-leader');
+    const stageSlider = document.getElementById('stage-slider');
+    const stageReadout = document.getElementById('stage-readout');
+    const playPauseBtn = document.getElementById('play-pause-btn');
+    const playPauseIcon = document.getElementById('play-pause-icon');
+    const playPauseText = document.getElementById('play-pause-text');
+    const replayBtn = document.getElementById('replay-btn');
+    const sortModeBtn = document.getElementById('sort-mode-btn');
+    const sortModeLabel = document.getElementById('sort-mode-label');
+    const soundToggleBtn = document.getElementById('sound-toggle-btn');
+    const soundIcon = document.getElementById('sound-icon');
+    const soundLabel = document.getElementById('sound-label');
+
+    // Bib Modal DOM
+    const bibModal = document.getElementById('bib-modal');
+    const closeBibBtn = document.getElementById('close-bib-btn');
+    const bibRunnerName = document.getElementById('bib-runner-name');
+    const bibNumber = document.getElementById('bib-number');
+    const bibQualStatus = document.getElementById('bib-qual-status');
+    const bibTotalPts = document.getElementById('bib-total-pts');
+    const bibStagesList = document.getElementById('bib-stages-list');
+
+    const laneElements = new Map();
+
+    function createLaneElement(runner) {
+      const lane = document.createElement('div');
+      lane.className = 'track-lane flex items-center cursor-pointer select-none';
+      lane.dataset.runnerId = runner.id;
+
+      const emojiChar = runner.gender === 'F' ? '🏃‍♀️' : '🏃‍♂️';
+      // Give each runner a slightly unique bob cadence so the pack looks lively & silly
+      const bobDuration = (0.32 + (runner.bib % 7) * 0.025).toFixed(3) + 's';
+
+      lane.innerHTML = `
+        <!-- Left Lane Info Box -->
+        <div class="w-40 sm:w-56 shrink-0 h-full bg-emerald-900/85 backdrop-blur-2xs border-r-2 border-white/80 px-2 sm:px-3 flex items-center justify-between gap-1.5 z-20">
+          <div class="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <span class="lane-rank w-6 h-6 rounded-lg text-[11px] font-black flex items-center justify-center shrink-0 bg-white/15 text-white">
+              1
+            </span>
+            <div class="min-w-0">
+              <div class="lane-name text-xs sm:text-[13px] font-extrabold text-white truncate">
+                ${runner.name}
+              </div>
+              <div class="lane-sub text-[10px] font-semibold text-emerald-200 truncate">
+                Bib #${String(runner.bib).padStart(2, '0')}
+              </div>
+            </div>
+          </div>
+          <span class="lane-rounds-badge px-1.5 py-0.5 rounded text-[10px] font-extrabold shrink-0 bg-emerald-950/80 text-amber-300 border border-amber-400/30">
+            0/4
+          </span>
+        </div>
+
+        <!-- Track Sprint Area (Left 0 pts -> Right 25 pts) -->
+        <div class="flex-1 h-full relative mr-6 sm:mr-10">
+          <div class="runner-mover" style="left: 0%;">
+            <div class="relative flex items-center">
+              <!-- Dust / Fire behind runner -->
+              <span class="runner-trail text-sm mr-0.5 select-none"></span>
+
+              <!-- Runner Emoji + Leader Crown -->
+              <div class="relative inline-flex items-center justify-center">
+                <span class="runner-crown hidden absolute -top-4 left-1/2 -translate-x-1/2 text-base crown-wiggle select-none">👑</span>
+                <span class="runner-bob bobbing-idle inline-block" style="--bob-speed: ${bobDuration};">
+                  <span class="runner-sprite">${emojiChar}</span>
+                </span>
+              </div>
+
+              <!-- Floating Score & Delta Pill -->
+              <div class="ml-1.5 flex items-center gap-1 bg-slate-900/90 text-white px-2 py-0.5 rounded-full border border-white/40 shadow-md whitespace-nowrap">
+                <span class="runner-pts text-xs font-black text-amber-300 tabular-nums">0</span>
+                <span class="runner-delta hidden text-[10px] font-extrabold px-1 rounded bg-emerald-500 text-slate-950">+0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      lane.addEventListener('click', () => openBibModal(runner.id));
+      lanesContainer.appendChild(lane);
+      return lane;
+    }
+
+    function renderControls() {
+      const stageObj = STAGES[state.stage];
+      announcerStage.textContent = stageObj.bannerTitle;
+      announcerText.textContent = stageObj.commentary;
+      announcerLeader.textContent = stageObj.leaderText;
+
+      stageSlider.value = String(state.stage);
+      stageReadout.textContent = stageObj.shortLabel;
+
+      playPauseIcon.textContent = state.isPlaying ? '⏸️' : '▶️';
+      playPauseText.textContent = state.isPlaying ? 'Pause' : 'Play';
+
+      sortModeLabel.textContent = state.sortByRank
+        ? 'Lanes: Sorted by Rank'
+        : 'Lanes: Fixed Bib #1–24';
+
+      // Stage buttons styling
+      document.querySelectorAll('.stage-btn').forEach((btn) => {
+        const s = Number(btn.dataset.stage);
+        if (s === state.stage) {
+          btn.className = 'stage-btn px-3 py-1.5 rounded-xl text-xs font-extrabold border transition cursor-pointer bg-amber-400 text-slate-950 border-amber-500 shadow-xs';
+        } else if (s < state.stage) {
+          btn.className = 'stage-btn px-3 py-1.5 rounded-xl text-xs font-extrabold border transition cursor-pointer bg-emerald-50 text-emerald-900 border-emerald-200 hover:bg-emerald-100';
+        } else {
+          btn.className = 'stage-btn px-3 py-1.5 rounded-xl text-xs font-extrabold border transition cursor-pointer bg-white text-slate-600 border-slate-200 hover:bg-slate-50';
+        }
+      });
+
+      // Speed buttons styling
+      document.querySelectorAll('.speed-btn').forEach((btn) => {
+        const spd = Number(btn.dataset.speed);
+        if (spd === state.speedMultiplier) {
+          btn.className = 'speed-btn px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer bg-white text-slate-900 shadow-2xs';
+        } else {
+          btn.className = 'speed-btn px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer text-slate-600 hover:text-slate-900';
+        }
+      });
+
+      // Filter buttons styling
+      document.querySelectorAll('.filter-btn').forEach((btn) => {
+        const f = btn.dataset.filter;
+        if (f === state.filterMode) {
+          btn.className = 'filter-btn px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer bg-white text-slate-900 shadow-2xs';
+        } else {
+          btn.className = 'filter-btn px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer text-slate-600 hover:text-slate-900';
+        }
+      });
+    }
+
+    function renderTrack() {
+      const visibleRunners = getOrderedRunners();
+      const totalHeight = Math.max(visibleRunners.length * LANE_HEIGHT, LANE_HEIGHT);
+
+      lanesContainer.style.height = `${totalHeight}px`;
+      trackWrapper.style.height = `${totalHeight}px`;
+
+      const visibleIds = new Set(visibleRunners.map((r) => r.id));
+
+      // Hide filtered-out lanes
+      laneElements.forEach((el, id) => {
+        if (!visibleIds.has(id)) {
+          el.style.opacity = '0';
+          el.style.pointerEvents = 'none';
+          el.style.transform = `translateY(${totalHeight + 40}px)`;
+        } else {
+          el.style.opacity = '1';
+          el.style.pointerEvents = 'auto';
+        }
+      });
+
+      visibleRunners.forEach((runner, laneIndex) => {
+        let lane = laneElements.get(runner.id);
+        if (!lane) {
+          lane = createLaneElement(runner);
+          laneElements.set(runner.id, lane);
+        }
+
+        // Vertical lane position
+        lane.style.transform = `translateY(${laneIndex * LANE_HEIGHT}px)`;
+
+        // Rank badge & podium medals
+        const rankBadge = lane.querySelector('.lane-rank');
+        if (state.stage === 0) {
+          rankBadge.textContent = `#${runner.bib}`;
+          rankBadge.className = 'lane-rank w-6 h-6 rounded-lg text-[11px] font-black flex items-center justify-center shrink-0 bg-white/15 text-white';
+        } else if (runner.rank === 1) {
+          rankBadge.textContent = '🥇';
+          rankBadge.className = 'lane-rank w-6 h-6 rounded-lg text-sm flex items-center justify-center shrink-0 bg-amber-400 shadow-2xs';
+        } else if (runner.rank === 2) {
+          rankBadge.textContent = '🥈';
+          rankBadge.className = 'lane-rank w-6 h-6 rounded-lg text-sm flex items-center justify-center shrink-0 bg-slate-200';
+        } else if (runner.rank === 3) {
+          rankBadge.textContent = '🥉';
+          rankBadge.className = 'lane-rank w-6 h-6 rounded-lg text-sm flex items-center justify-center shrink-0 bg-orange-200';
+        } else {
+          rankBadge.textContent = String(runner.rank);
+          rankBadge.className = 'lane-rank w-6 h-6 rounded-lg text-[11px] font-black flex items-center justify-center shrink-0 bg-white/15 text-white';
+        }
+
+        // Subtitle & rounds pill
+        const subEl = lane.querySelector('.lane-sub');
+        const roundsBadge = lane.querySelector('.lane-rounds-badge');
+        roundsBadge.textContent = `${runner.roundsRun}/4`;
+
+        if (state.stage === 0) {
+          subEl.textContent = `Bib #${String(runner.bib).padStart(2, '0')} • Ready`;
+          roundsBadge.className = 'lane-rounds-badge px-1.5 py-0.5 rounded text-[10px] font-extrabold shrink-0 bg-emerald-950/80 text-emerald-200';
+        } else if (runner.isQualified) {
+          subEl.textContent = '✅ Qualified (≥3 rds)';
+          roundsBadge.className = 'lane-rounds-badge px-1.5 py-0.5 rounded text-[10px] font-extrabold shrink-0 bg-emerald-400 text-slate-950';
+        } else {
+          subEl.textContent = '⏳ Needs 3 rounds';
+          roundsBadge.className = 'lane-rounds-badge px-1.5 py-0.5 rounded text-[10px] font-extrabold shrink-0 bg-amber-400/25 text-amber-200 border border-amber-300/40';
+        }
+
+        // Horizontal position along track (0 to 25 pts -> 2% to 96% so runner stays neatly inside track bounds)
+        const mover = lane.querySelector('.runner-mover');
+        const clampedPts = Math.min(runner.totalPoints, MAX_TRACK_POINTS);
+        const pct = state.stage === 0 ? 2 : 2 + (clampedPts / MAX_TRACK_POINTS) * 94;
+        mover.style.left = `${pct}%`;
+
+        // Crown on #1 leader
+        const crownEl = lane.querySelector('.runner-crown');
+        if (state.stage > 0 && runner.rank === 1) {
+          crownEl.classList.remove('hidden');
+        } else {
+          crownEl.classList.add('hidden');
+        }
+
+        // Bouncy gait & silly dust/fire effects
+        const bobEl = lane.querySelector('.runner-bob');
+        const trailEl = lane.querySelector('.runner-trail');
+
+        if (state.stage > 0 && runner.stageDelta > 0) {
+          bobEl.classList.remove('bobbing-idle');
+          bobEl.classList.add('bobbing-fast');
+          if (runner.stageDelta >= 10) {
+            trailEl.textContent = '🔥💨';
+            trailEl.className = 'runner-trail text-sm mr-0.5 select-none dust-cloud';
+          } else if (runner.stageDelta >= 5) {
+            trailEl.textContent = '💨';
+            trailEl.className = 'runner-trail text-sm mr-0.5 select-none dust-cloud';
+          } else {
+            trailEl.textContent = '💦';
+            trailEl.className = 'runner-trail text-xs mr-0.5 select-none';
+          }
+        } else {
+          bobEl.classList.remove('bobbing-fast');
+          bobEl.classList.add('bobbing-idle');
+          trailEl.textContent = '';
+        }
+
+        // Score & stage delta pill
+        const ptsEl = lane.querySelector('.runner-pts');
+        const deltaEl = lane.querySelector('.runner-delta');
+        ptsEl.textContent = `${runner.totalPoints}p`;
+
+        if (state.stage > 0 && runner.stageDelta > 0) {
+          deltaEl.textContent = `+${runner.stageDelta}`;
+          deltaEl.classList.remove('hidden');
+          deltaEl.className = runner.stageDelta >= 10
+            ? 'runner-delta text-[10px] font-black px-1.5 rounded-full bg-amber-400 text-slate-950'
+            : 'runner-delta text-[10px] font-extrabold px-1.5 rounded-full bg-emerald-400 text-slate-950';
+        } else {
+          deltaEl.classList.add('hidden');
+        }
+      });
+    }
+
+    // =========================================================================
+    // 5. BIB CARD MODAL
+    // =========================================================================
+    function openBibModal(runnerId) {
+      const runner = RUNNERS.find((r) => r.id === runnerId);
+      if (!runner) return;
+
+      const stats = computeRunnerAtStage(runner, 4);
+      bibRunnerName.textContent = runner.name;
+      bibNumber.textContent = `#${String(runner.bib).padStart(2, '0')}`;
+      bibTotalPts.textContent = `${stats.totalPoints} pts`;
+
+      if (stats.isQualified) {
+        bibQualStatus.textContent = `✅ Qualified (${stats.roundsRun}/4 rounds completed)`;
+        bibQualStatus.className = 'text-sm font-extrabold text-emerald-700 mt-0.5';
+      } else {
+        const needed = 3 - stats.roundsRun;
+        bibQualStatus.textContent = `⏳ Not yet qualified (${stats.roundsRun}/4 rounds • needs ${needed} more)`;
+        bibQualStatus.className = 'text-sm font-extrabold text-amber-700 mt-0.5';
+      }
+
+      const stageNames = [
+        'R1 • Kedron (3 Oct)',
+        'R2 • Bunyaville (17 Oct)',
+        'R3 • Sandgate (7 Nov)',
+        'R4 • Samfordparklands (21 Nov)'
+      ];
+
+      bibStagesList.innerHTML = stageNames.map((label, idx) => {
+        const pts = runner.points[idx];
+        const didRun = pts > 0;
+        return `
+          <div class="flex items-center justify-between p-2.5 rounded-xl border ${didRun ? 'bg-emerald-50/60 border-emerald-200' : 'bg-slate-50 border-slate-200 opacity-70'}">
+            <div>
+              <div class="text-xs font-extrabold text-slate-800">${label}</div>
+              <div class="text-[11px] text-slate-600">${runner.details[idx]}</div>
+            </div>
+            <div class="arcade-font text-base font-bold px-2.5 py-1 rounded-lg ${didRun ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-500'}">
+              ${didRun ? `+${pts} pts` : '0 pts'}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      bibModal.classList.remove('hidden');
+      bibModal.classList.add('flex');
+      sfx.playBeep(660, 0.08, 'triangle');
+    }
+
+    function closeBibModal() {
+      bibModal.classList.add('hidden');
+      bibModal.classList.remove('flex');
+    }
+
+    closeBibBtn.addEventListener('click', closeBibModal);
+    bibModal.addEventListener('click', (e) => {
+      if (e.target === bibModal) closeBibModal();
+    });
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeBibModal();
+    });
+
+    // =========================================================================
+    // 6. PLAYBACK ENGINE & INTERACTIONS
+    // =========================================================================
+    function goToStage(newStage, pauseFirst = false) {
+      if (pauseFirst && state.isPlaying) {
+        pauseRace();
+      }
+      state.stage = Math.max(0, Math.min(4, Number(newStage)));
+      sfx.playStageAdvance(state.stage);
+      renderControls();
+      renderTrack();
+    }
+
+    function startRace() {
+      if (state.timerId) clearInterval(state.timerId);
+      state.isPlaying = true;
+      renderControls();
+
+      const intervalMs = Math.round(2200 / state.speedMultiplier);
+      state.timerId = setInterval(() => {
+        if (state.stage < 4) {
+          state.stage += 1;
+          sfx.playStageAdvance(state.stage);
+          renderControls();
+          renderTrack();
+        } else {
+          // Pause at the R4 photo finish so user can admire the leaderboard!
+          pauseRace();
+        }
+      }, intervalMs);
+    }
+
+    function pauseRace() {
+      state.isPlaying = false;
+      if (state.timerId) {
+        clearInterval(state.timerId);
+        state.timerId = null;
+      }
+      renderControls();
+    }
+
+    playPauseBtn.addEventListener('click', () => {
+      if (state.isPlaying) {
+        pauseRace();
+      } else {
+        if (state.stage === 4) {
+          state.stage = 0;
+          renderControls();
+          renderTrack();
+        }
+        startRace();
+      }
+    });
+
+    replayBtn.addEventListener('click', () => {
+      pauseRace();
+      state.stage = 0;
+      renderControls();
+      renderTrack();
+      setTimeout(() => startRace(), 350);
+    });
+
+    stageSlider.addEventListener('input', (e) => {
+      goToStage(e.target.value, true);
+    });
+
+    document.querySelectorAll('.stage-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        goToStage(Number(btn.dataset.stage), true);
+      });
+    });
+
+    document.querySelectorAll('.speed-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.speedMultiplier = Number(btn.dataset.speed);
+        renderControls();
+        if (state.isPlaying) {
+          startRace();
+        }
+      });
+    });
+
+    sortModeBtn.addEventListener('click', () => {
+      state.sortByRank = !state.sortByRank;
+      renderControls();
+      renderTrack();
+    });
+
+    document.querySelectorAll('.filter-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.filterMode = btn.dataset.filter;
+        renderControls();
+        renderTrack();
+      });
+    });
+
+    soundToggleBtn.addEventListener('click', () => {
+      const on = sfx.toggle();
+      soundIcon.textContent = on ? '🔊' : '🔇';
+      soundLabel.textContent = on ? 'SFX On' : 'SFX Off';
+    });
+
+    // =========================================================================
+    // 7. INITIALIZATION
+    // =========================================================================
+    window.addEventListener('DOMContentLoaded', () => {
+      renderControls();
+      renderTrack();
+      // Brief pause on the starting blocks before firing the starter pistol!
+      setTimeout(() => {
+        if (state.isPlaying && state.stage === 0) {
+          state.stage = 1;
+          sfx.playStageAdvance(1);
+          renderControls();
+          renderTrack();
+          startRace();
+        }
+      }, 900);
+    });
+  </script>
+</body>
+</html>
