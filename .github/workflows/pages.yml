@@ -26,6 +26,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: ./build_site.py
+      - run: cp eprs_parkrun_challenge_2026_bar_race.html site/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
